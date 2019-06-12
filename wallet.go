@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/OpenBazaar/wallet-interface"
-	"github.com/bubbajoe/BitcoinCash-Wallet/exchangerates"
+	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
+	"github.com/BubbaJoe/spvwallet-cash/exchangerates"
 	"github.com/gcash/bchd/bchec"
 	"github.com/gcash/bchd/chaincfg"
 	"github.com/gcash/bchd/chaincfg/chainhash"
@@ -439,8 +439,35 @@ func (w *SPVWallet) Params() *chaincfg.Params {
 	return w.params
 }
 
-func (w *SPVWallet) AddTransactionListener(callback func(wallet.TransactionCallback)) {
+func (w *SPVWallet) AddTransactionListener(everyTx bool, callback func(wallet.TransactionCallback)) int {
+	w.txstore.showEveryTx[len(w.txstore.listeners)] = everyTx
 	w.txstore.listeners = append(w.txstore.listeners, callback)
+	return len(w.txstore.listeners) - 1
+}
+
+func (w *SPVWallet) RemoveTransactionListener(cbId int) error {
+	if _, ok := w.txstore.showEveryTx[cbId]; !ok {
+		return errors.New("invalid transaction listener id")
+	}
+	w.txstore.listeners[cbId] = nil
+	delete(w.txstore.showEveryTx, cbId)
+	return nil
+}
+
+func (w *SPVWallet) AddBlockListener(tipOnly bool, callback func(wallet.BlockCallback)) int {
+	id := len(w.wireService.listeners)
+	w.wireService.showTipOnly[id] = tipOnly
+	w.wireService.listeners = append(w.wireService.listeners, callback)
+	return id
+}
+
+func (w *SPVWallet) RemoveBlockListener(cbId int) error {
+	if ok := w.wireService.showTipOnly[cbId]; !ok {
+		return errors.New("invalid transaction listener id")
+	}
+	w.wireService.listeners[cbId] = nil
+	delete(w.wireService.showTipOnly, cbId)
+	return nil
 }
 
 func (w *SPVWallet) ChainTip() (uint32, chainhash.Hash) {
@@ -458,6 +485,18 @@ func (w *SPVWallet) AddWatchedAddress(addr bchutil.Address) error {
 		return err
 	}
 	err = w.txstore.WatchedScripts().Put(script)
+	w.txstore.PopulateAdrs()
+
+	w.wireService.MsgChan() <- updateFiltersMsg{}
+	return err
+}
+
+func (w *SPVWallet) RemoveWatchedAddress(addr bchutil.Address) error {
+	script, err := w.AddressToScript(addr)
+	if err != nil {
+		return err
+	}
+	err = w.txstore.WatchedScripts().Delete(script)
 	w.txstore.PopulateAdrs()
 
 	w.wireService.MsgChan() <- updateFiltersMsg{}

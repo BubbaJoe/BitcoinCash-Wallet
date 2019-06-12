@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
-	"github.com/OpenBazaar/wallet-interface"
+	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
 	"github.com/gcash/bchd/bchec"
 	"github.com/gcash/bchd/chaincfg/chainhash"
 	"github.com/gcash/bchd/wire"

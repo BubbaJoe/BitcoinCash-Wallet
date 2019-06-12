@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/OpenBazaar/wallet-interface"
+	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
 	"github.com/gcash/bchd/bchec"
 	"math/rand"
 	"strconv"

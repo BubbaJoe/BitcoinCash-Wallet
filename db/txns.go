@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/OpenBazaar/wallet-interface"
+	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
 	"github.com/gcash/bchd/chaincfg/chainhash"
 	"github.com/gcash/bchd/wire"
 )
