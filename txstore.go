@@ -378,7 +378,6 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32, timestamp time.Time) (ui
 	}
 
 	// If hits is nonzero it's a relevant tx and we should store it
-	ts.cbMutex.Lock()
 	if hits > 0 || matchesWatchOnly {
 		ts.txidsMutex.Lock()
 		txn, err := ts.Txns().Get(tx.TxHash())
@@ -405,24 +404,31 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32, timestamp time.Time) (ui
 		cb.BlockTime = timestamp
 		ts.txidsMutex.Unlock()
 		if shouldCallback {
-			// Callback on listeners
-			for _, listener := range ts.listeners {
-				if listener != nil {
-					listener(cb)
+			ts.cbMutex.Lock()
+			go func() {
+				// Callback on listeners
+				for _, listener := range ts.listeners {
+					if listener != nil {
+						listener(cb)
+					}
 				}
-			}
+			}()
+			ts.cbMutex.Unlock()
 		}
 		ts.PopulateAdrs()
 		hits++
 	} else {
 		cb.BlockTime = timestamp
-		for i, listener := range ts.listeners {
-			if shouldShow, ok := ts.showEveryTx[i]; ok && shouldShow && (listener != nil) {
-				listener(cb)
+		go func() {
+			ts.cbMutex.Lock()
+			for i, listener := range ts.listeners {
+				if shouldShow, ok := ts.showEveryTx[i]; ok && shouldShow && (listener != nil) {
+					listener(cb)
+				}
 			}
-		}
+			ts.cbMutex.Unlock()
+		}()
 	}
-	ts.cbMutex.Unlock()
 
 	return hits, err
 }

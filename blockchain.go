@@ -154,19 +154,18 @@ func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeade
 	// Check the header meets the difficulty requirement
 	if b.params.Name != chaincfg.RegressionNetParams.Name { // Don't need to check difficulty on regtest
 		diffTarget, err := b.calcRequiredWork(header, int32(height+1), prevHeader)
-		if err != nil {
-			log.Errorf("Error calclating difficulty: %v", err)
-			return false
+		if err == nil {
+			if header.Bits != diffTarget && b.params.Name == chaincfg.MainNetParams.Name {
+				log.Warningf("Block %d %s incorrect difficulty.  Read %d, expect %d\n",
+					height+1, header.BlockHash().String(), header.Bits, diffTarget)
+				return false
+			} else if diffTarget == b.params.PowLimitBits && header.Bits > diffTarget && b.params.Name == chaincfg.TestNet3Params.Name {
+				log.Warningf("Block %d %s incorrect difficulty.  Read %d, expect %d\n",
+					height+1, header.BlockHash().String(), header.Bits, diffTarget)
+				return false
+			}
 		}
-		if header.Bits != diffTarget && b.params.Name == chaincfg.MainNetParams.Name {
-			log.Warningf("Block %d %s incorrect difficulty.  Read %d, expect %d\n",
-				height+1, header.BlockHash().String(), header.Bits, diffTarget)
-			return false
-		} else if diffTarget == b.params.PowLimitBits && header.Bits > diffTarget && b.params.Name == chaincfg.TestNet3Params.Name {
-			log.Warningf("Block %d %s incorrect difficulty.  Read %d, expect %d\n",
-				height+1, header.BlockHash().String(), header.Bits, diffTarget)
-			return false
-		}
+
 	}
 
 	// Check if there's a valid proof of work.  That whole "Bitcoin" thing.
@@ -403,6 +402,32 @@ func (b *Blockchain) Rollback(t time.Time) error {
 		}
 	}
 	err = b.db.DeleteAfter(rollbackHeight)
+	if err != nil {
+		return err
+	}
+	return b.db.Put(sh, true)
+}
+
+func (b *Blockchain) RollbackToHeight(rollbackHeight uint32) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	checkpoint := GetCheckpoint(b.crationDate, b.params)
+	checkPointHash := checkpoint.Header.BlockHash()
+	sh, err := b.db.GetBestHeader()
+	if err != nil {
+		return err
+	}
+	// If t is greater than the timestamp at the tip then do nothing
+	if rollbackHeight > sh.height {
+		return nil
+	}
+	// If the tip is our checkpoint then do nothing
+	checkHash := sh.header.BlockHash()
+	if checkHash.IsEqual(&checkPointHash) {
+		return nil
+	}
+
+	err = b.db.DeleteAfter(rollbackHeight - 1)
 	if err != nil {
 		return err
 	}
