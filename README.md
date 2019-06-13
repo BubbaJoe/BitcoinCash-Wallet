@@ -112,11 +112,17 @@ type BitcoinWallet interface {
 	// Adds a script to the wallet and get notifications back when coins are received or spent from it
 	RemoveWatchedScript(script []byte) error
 
-	// Adds a callback for incoming transactions, push
+	// Adds a callback for incoming transactions. the showEveryTx will not filter, and show all tx's - eturns a callbackId
 	AddTransactionListener(showEveryTx bool, callback func(spvwallet.TransactionCallback)) (callbackId int)
 
-	// Adds a callback for incoming transactions, push
+	// Removes a transaction listener by the callbackId and returns and error
 	RemoveTransactionListener(callbackId int) error
+
+	// Adds a callback for incoming blocks. the showTipOnly will only show blocks with 1 confirmation tx's. Returns a callbackId
+	AddBlockListener(showTipOnly bool, callback func(spvwallet.BlockCallback)) (callbackId int)
+
+	// Removes a block listener by the callbackId and returns and error
+	RemoveBlockListener(callbackId int) error
 
 	// Use this to re-download merkle blocks in case of missed transactions
 	ReSyncBlockchain(fromHeight int32)

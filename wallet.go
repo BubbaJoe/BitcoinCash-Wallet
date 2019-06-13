@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
 	"github.com/BubbaJoe/spvwallet-cash/exchangerates"
+	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
 	"github.com/gcash/bchd/bchec"
 	"github.com/gcash/bchd/chaincfg"
 	"github.com/gcash/bchd/chaincfg/chainhash"
@@ -349,15 +349,21 @@ func (w *SPVWallet) Balance() (confirmed, unconfirmed int64) {
 	stxos, _ := w.txstore.Stxos().GetAll()
 	for _, utxo := range utxos {
 		if !utxo.WatchOnly {
-			if utxo.AtHeight > 0 {
+			confs, _, err := w.GetConfirmations(utxo.Op.Hash)
+			if err != nil {
+				continue
+			}
+			if confs > 0 {
 				confirmed += utxo.Value
 			} else {
+				// TODO: Need to check if the utxo is spent
 				if w.checkIfStxoIsConfirmed(utxo, stxos) {
 					confirmed += utxo.Value
 				} else {
 					unconfirmed += utxo.Value
 				}
 			}
+
 		}
 	}
 	return confirmed, unconfirmed
