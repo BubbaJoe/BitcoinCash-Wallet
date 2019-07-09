@@ -1,17 +1,18 @@
 package bitcoincash
 
 import (
-	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
-	"github.com/gcash/bchd/chaincfg"
-	"github.com/mitchellh/go-homedir"
-	"github.com/op/go-logging"
-	"golang.org/x/net/proxy"
 	"net"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
+	"github.com/gcash/bchd/chaincfg"
+	"github.com/mitchellh/go-homedir"
+	"github.com/op/go-logging"
+	"golang.org/x/net/proxy"
 )
 
 type Config struct {
@@ -73,12 +74,12 @@ func NewDefaultConfig() *Config {
 	feeApi, _ := url.Parse("https://bitcoinfees.21.co/api/v1/fees/recommended")
 	return &Config{
 		Params:    &chaincfg.MainNetParams,
-		UserAgent: "spvwallet",
+		UserAgent: "spvwallet-cash",
 		RepoPath:  repoPath,
-		LowFee:    140,
-		MediumFee: 160,
-		HighFee:   180,
-		MaxFee:    2000,
+		LowFee:    1,
+		MediumFee: 1,
+		HighFee:   2,
+		MaxFee:    5,
 		FeeAPI:    *feeApi,
 		Logger:    logging.NewLogBackend(os.Stdout, "", 0),
 	}
@@ -94,7 +95,7 @@ func getRepoPath() (string, error) {
 	case "linux":
 		directoryName = ".bitcoincash"
 	case "darwin":
-		path = "~/Library/Application Support"
+		path = "~/."
 	}
 
 	// Join the path and directory name, then expand the home path

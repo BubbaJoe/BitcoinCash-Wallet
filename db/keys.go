@@ -5,11 +5,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
-	"github.com/gcash/bchd/bchec"
 	"math/rand"
 	"strconv"
 	"sync"
+
+	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
+	"github.com/gcash/bchd/bchec"
+	"github.com/prometheus/common/log"
 )
 
 type KeysDB struct {
@@ -22,12 +24,14 @@ func (k *KeysDB) Put(scriptAddress []byte, keyPath wallet.KeyPath) error {
 	defer k.lock.Unlock()
 	tx, err := k.db.Begin()
 	if err != nil {
+		log.Error("Unable to put key in database")
 		return err
 	}
 	stmt, _ := tx.Prepare("insert into keys(scriptAddress, purpose, keyIndex, used) values(?,?,?,?)")
 	defer stmt.Close()
 	_, err = stmt.Exec(hex.EncodeToString(scriptAddress), int(keyPath.Purpose), keyPath.Index, 0)
 	if err != nil {
+		log.Error("Unable to put key in database")
 		tx.Rollback()
 		return err
 	}
@@ -63,12 +67,14 @@ func (k *KeysDB) MarkKeyAsUsed(scriptAddress []byte) error {
 	}
 	stmt, err := tx.Prepare("update keys set used=1 where scriptAddress=?")
 	if err != nil {
+		log.Error("Unable to set key as used")
 		tx.Rollback()
 		return err
 	}
 	defer stmt.Close()
 	_, err = stmt.Exec(hex.EncodeToString(scriptAddress))
 	if err != nil {
+		log.Error("Unable to set key as used")
 		tx.Rollback()
 		return err
 	}
@@ -121,7 +127,7 @@ func (k *KeysDB) GetKey(scriptAddress []byte) (*bchec.PrivateKey, error) {
 	k.lock.RLock()
 	defer k.lock.RUnlock()
 
-	stmt, err := k.db.Prepare("select key from keys where scriptAddress=? and purpose=-1")
+	stmt, err := k.db.Prepare("select key from keys where scriptAddress=?")
 	defer stmt.Close()
 	var keyHex string
 	err = stmt.QueryRow(hex.EncodeToString(scriptAddress)).Scan(&keyHex)

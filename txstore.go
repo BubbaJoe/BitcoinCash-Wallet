@@ -218,7 +218,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32, timestamp time.Time) (ui
 	sh, ok := ts.txids[tx.TxHash().String()]
 	ts.txidsMutex.RUnlock()
 	if ok && (sh > 0 || (sh == 0 && height == 0)) {
-		return 1, nil
+		return 0, nil
 	}
 
 	// Check to see if this is a double spend

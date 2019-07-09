@@ -251,7 +251,7 @@ func (h *HeaderDB) GetHeader(hash chainhash.Hash) (sh StoredHeader, err error) {
 		hdrs := btx.Bucket(BKTHeaders)
 		b := hdrs.Get(hash.CloneBytes())
 		if b == nil {
-			return errors.New("Header does not exist in database")
+			return errors.New("No header found: " + hash.String())
 		}
 		sh, err = deserializeHeader(b)
 		if err != nil {

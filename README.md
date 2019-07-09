@@ -125,7 +125,7 @@ type BitcoinWallet interface {
 	RemoveBlockListener(callbackId int) error
 
 	// Use this to re-download merkle blocks in case of missed transactions
-	ReSyncBlockchain(fromHeight int32)
+	ReSyncBlockchain(time time.Time)
 
 	// Return the number of confirmations and the height for a transaction
 	GetConfirmations(txid chainhash.Hash) (confirms, atHeight uint32, err error)

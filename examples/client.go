@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	bitcoincash "github.com/BubbaJoe/spvwallet-cash"
@@ -24,8 +25,21 @@ func main() {
 	config.Params = &chaincfg.MainNetParams
 
 	// Select wallet datastore
-	sqliteDatastore, _ := db.Create(config.RepoPath)
-	config.DB = sqliteDatastore
+	datastore, _ := db.Create(config.RepoPath)
+	config.DB = datastore
+
+	mnemonic, err := datastore.GetMnemonic()
+	if err != nil {
+		log.Println("No mnemonic found.. Creating a new private keys")
+	} else {
+		config.Mnemonic = mnemonic
+		creationDate, err := datastore.GetCreationDate()
+		if err != nil {
+			log.Println("mnemonic has no no creation date...", err)
+		} else {
+			config.CreationDate = creationDate
+		}
+	}
 
 	// Create the wallet
 	wallet, err := bitcoincash.NewSPVWallet(config)
@@ -35,6 +49,6 @@ func main() {
 	}
 
 	// Start it!
-	go wallet.Start()
+	wallet.Start()
 	<-make(chan os.Signal)
 }

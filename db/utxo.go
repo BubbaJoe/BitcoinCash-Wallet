@@ -3,12 +3,13 @@ package db
 import (
 	"database/sql"
 	"encoding/hex"
-	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
-	"github.com/gcash/bchd/chaincfg/chainhash"
-	"github.com/gcash/bchd/wire"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
+	"github.com/gcash/bchd/chaincfg/chainhash"
+	"github.com/gcash/bchd/wire"
 )
 
 type UtxoDB struct {

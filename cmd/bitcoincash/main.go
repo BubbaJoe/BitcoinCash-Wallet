@@ -17,16 +17,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
-	"github.com/asticode/go-astilectron"
-	"github.com/asticode/go-astilog"
-	"github.com/atotto/clipboard"
 	bc "github.com/BubbaJoe/spvwallet-cash"
 	"github.com/BubbaJoe/spvwallet-cash/api"
 	"github.com/BubbaJoe/spvwallet-cash/cli"
 	"github.com/BubbaJoe/spvwallet-cash/db"
 	"github.com/BubbaJoe/spvwallet-cash/gui"
 	"github.com/BubbaJoe/spvwallet-cash/gui/bootstrap"
+	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
+	"github.com/asticode/go-astilectron"
+	"github.com/asticode/go-astilog"
+	"github.com/atotto/clipboard"
 	"github.com/fatih/color"
 	"github.com/gcash/bchd/bchec"
 	"github.com/gcash/bchd/chaincfg"
@@ -34,6 +34,7 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/natefinch/lumberjack"
 	"github.com/op/go-logging"
+	"github.com/prometheus/common/log"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/yawning/bulb"
 	"golang.org/x/net/proxy"
@@ -293,13 +294,16 @@ func (x *Start) Execute(args []string) error {
 	// Create the wallet
 	cashWallet, err = bc.NewSPVWallet(config)
 	if err != nil {
+		log.Error(err)
 		return err
 	}
 
 	if err := sqliteDatastore.SetMnemonic(config.Mnemonic); err != nil {
+		log.Error(err)
 		return err
 	}
 	if err := sqliteDatastore.SetCreationDate(config.CreationDate); err != nil {
+		log.Error(err)
 		return err
 	}
 

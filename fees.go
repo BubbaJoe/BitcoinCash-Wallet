@@ -1,9 +1,10 @@
 package bitcoincash
 
 import (
-	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
 	"net/http"
 	"time"
+
+	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
 )
 
 type httpClient interface {
@@ -69,35 +70,36 @@ func (fp *FeeProvider) GetFeePerByte(feeLevel wallet.FeeLevel) uint64 {
 			return fp.normalFee
 		}
 	}
-	if fp.exchangeRates == nil {
-		return defaultFee()
-	}
+	return defaultFee()
+	// if fp.exchangeRates == nil {
+	// 	return defaultFee()
+	// }
 
-	rate, err := fp.exchangeRates.GetLatestRate("USD")
-	if err != nil || rate == 0 {
-		log.Errorf("Error using exchange rate to calculate fee: %s\n", err.Error())
-		return defaultFee()
-	}
+	// rate, err := fp.exchangeRates.GetLatestRate("USD")
+	// if err != nil || rate == 0 {
+	// 	log.Errorf("Error using exchange rate to calculate fee: %s\n", err.Error())
+	// 	return defaultFee()
+	// }
 
-	var target FeeTarget
-	switch feeLevel {
-	case wallet.PRIOIRTY:
-		target = PriorityTarget
-	case wallet.NORMAL:
-		target = NormalTarget
-	case wallet.ECONOMIC:
-		target = EconomicTarget
-	case wallet.FEE_BUMP:
-		target = PriorityTarget * 2
-	default:
-		target = NormalTarget
-	}
+	// var target FeeTarget
+	// switch feeLevel {
+	// case wallet.PRIOIRTY:
+	// 	target = PriorityTarget
+	// case wallet.NORMAL:
+	// 	target = NormalTarget
+	// case wallet.ECONOMIC:
+	// 	target = EconomicTarget
+	// case wallet.FEE_BUMP:
+	// 	target = PriorityTarget * 2
+	// default:
+	// 	target = NormalTarget
+	// }
 
-	feePerByte := (((float64(target) / 100) / rate) * 100000000) / 226
+	// feePerByte := (((float64(target) / 100) / rate) * 100000000) / 226
 
-	if uint64(feePerByte) > fp.maxFee {
-		return fp.maxFee
-	}
+	// if uint64(feePerByte) > fp.maxFee {
+	// 	return fp.maxFee
+	// }
 
-	return uint64(feePerByte)
+	// return uint64(feePerByte)
 }

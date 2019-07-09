@@ -154,18 +154,20 @@ func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeade
 	// Check the header meets the difficulty requirement
 	if b.params.Name != chaincfg.RegressionNetParams.Name { // Don't need to check difficulty on regtest
 		diffTarget, err := b.calcRequiredWork(header, int32(height+1), prevHeader)
-		if err == nil {
-			if header.Bits != diffTarget && b.params.Name == chaincfg.MainNetParams.Name {
-				log.Warningf("Block %d %s incorrect difficulty.  Read %d, expect %d\n",
-					height+1, header.BlockHash().String(), header.Bits, diffTarget)
-				return false
-			} else if diffTarget == b.params.PowLimitBits && header.Bits > diffTarget && b.params.Name == chaincfg.TestNet3Params.Name {
-				log.Warningf("Block %d %s incorrect difficulty.  Read %d, expect %d\n",
-					height+1, header.BlockHash().String(), header.Bits, diffTarget)
-				return false
-			}
+		if err != nil {
+			log.Errorf("Error calclating difficulty: %v", err)
+			return false
 		}
-
+		if header.Bits != diffTarget && b.params.Name == chaincfg.MainNetParams.Name {
+			log.Warningf("Block %d %s incorrect difficulty.  Read %d, expect %d\n",
+				height+1, header.BlockHash().String(), header.Bits, diffTarget)
+			return false
+		}
+		if diffTarget == b.params.PowLimitBits && header.Bits > diffTarget && b.params.Name == chaincfg.TestNet3Params.Name {
+			log.Warningf("Block %d %s incorrect difficulty.  Read %d, expect %d\n",
+				height+1, header.BlockHash().String(), header.Bits, diffTarget)
+			return false
+		}
 	}
 
 	// Check if there's a valid proof of work.  That whole "Bitcoin" thing.

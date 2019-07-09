@@ -2,11 +2,12 @@ package db
 
 import (
 	"database/sql"
-	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
-	_ "github.com/mattn/go-sqlite3"
 	"path"
 	"sync"
 	"time"
+
+	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // This database is mostly just an example implementation used for testing.
@@ -154,6 +155,27 @@ func (s *SQLiteDatastore) SetCreationDate(creationDate time.Time) error {
 	}
 	defer stmt.Close()
 	_, err = stmt.Exec("creationDate", creationDate.Format(time.RFC3339))
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	tx.Commit()
+	return nil
+}
+
+func (s *SQLiteDatastore) SetConfigKV(key, value string) error {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare("insert into config(key, value) values(?,?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(key, value)
 	if err != nil {
 		tx.Rollback()
 		return err

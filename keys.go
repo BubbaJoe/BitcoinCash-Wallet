@@ -7,7 +7,7 @@ import (
 	hd "github.com/gcash/bchutil/hdkeychain"
 )
 
-const LOOKAHEADWINDOW = 100
+const LOOKAHEADWINDOW = 1000
 
 type KeyManager struct {
 	datastore wallet.Keys
@@ -75,13 +75,50 @@ func (km *KeyManager) GetCurrentKey(purpose wallet.KeyPurpose) (*hd.ExtendedKey,
 	return km.generateChildKey(purpose, uint32(i[0]))
 }
 
+func (km *KeyManager) GetNewKey(purpose wallet.KeyPurpose) (*hd.ExtendedKey, error) {
+	index, _, err := km.datastore.GetLastKeyIndex(purpose)
+	var childKey *hd.ExtendedKey
+	if err != nil {
+		index = 0
+	}
+	for {
+		index++
+		// There is a small possibility bip32 keys can be invalid. The procedure in such cases
+		// is to discard the key and derive the next one. This loop will continue until a valid key
+		// is derived.
+		childKey, err = km.generateChildKey(purpose, uint32(index))
+		if err == nil {
+			break
+		}
+		pkh, err := childKey.Address(km.params)
+		if err == nil {
+			continue
+		}
+		privkey, err := childKey.ECPrivKey()
+		if err == nil {
+			continue
+		}
+		km.datastore.ImportKey(pkh.ScriptAddress(), privkey)
+	}
+	addr, err := childKey.Address(km.params)
+	if err != nil {
+		return nil, err
+	}
+	p := wallet.KeyPath{wallet.KeyPurpose(purpose), index}
+	err = km.datastore.Put(addr.ScriptAddress(), p)
+	if err != nil {
+		return nil, err
+	}
+	return childKey, nil
+}
+
 func (km *KeyManager) GetFreshKey(purpose wallet.KeyPurpose) (*hd.ExtendedKey, error) {
 	index, _, err := km.datastore.GetLastKeyIndex(purpose)
 	var childKey *hd.ExtendedKey
 	if err != nil {
 		index = 0
 	} else {
-		index += 1
+		index++
 	}
 	for {
 		// There is a small possibility bip32 keys can be invalid. The procedure in such cases
@@ -91,7 +128,7 @@ func (km *KeyManager) GetFreshKey(purpose wallet.KeyPurpose) (*hd.ExtendedKey, e
 		if err == nil {
 			break
 		}
-		index += 1
+		index++
 	}
 	addr, err := childKey.Address(km.params)
 	if err != nil {
@@ -125,38 +162,70 @@ func (km *KeyManager) GetKeys() []*hd.ExtendedKey {
 	for _, key := range imported {
 		hdKey := hd.NewExtendedKey(
 			km.params.HDPrivateKeyID[:],
-			key.Serialize(),
-			make([]byte, 32),
+			key.Serialize(), make([]byte, 32),
 			[]byte{0x00, 0x00, 0x00, 0x00},
-			0,
-			0,
-			true)
+			0, 0, true)
 		keys = append(keys, hdKey)
 	}
 	return keys
 }
+
+// func (km *KeyManager) GetKeyForAddress(address bchutil.Address) (*hd.ExtendedKey, error) {
+// 	keyPaths, err := km.datastore.GetAll()
+// 	if err != nil {
+// 		key, err := km.datastore.GetKey(address.ScriptAddress())
+// 		if err != nil {
+// 			log.Debug(err)
+// 			return nil, err
+// 		}
+// 		hdKey := hd.NewExtendedKey(
+// 			km.params.HDPrivateKeyID[:],
+// 			key.Serialize(), make([]byte, 32),
+// 			[]byte{0x00, 0x00, 0x00, 0x00},
+// 			0, 0, true)
+// 		return hdKey, nil
+// 	}
+
+// 	for _, path := range keyPaths {
+// 		k, err := km.generateChildKey(path.Purpose, uint32(path.Index))
+// 		if err != nil {
+// 			continue
+// 		}
+
+// 		pkh, err := k.Address(km.params)
+// 		if err != nil {
+// 			continue
+// 		}
+
+// 		compare := bytes.Compare(pkh.ScriptAddress(), address.ScriptAddress())
+
+// 		if compare == 0 {
+// 			_, err := km.GetKeyForScript(pkh.ScriptAddress())
+// 			log.Error(err)
+// 			return k, nil
+// 		}
+// 	}
+// 	return nil, errors.New("Not found")
+// }
 
 func (km *KeyManager) GetKeyForScript(scriptAddress []byte) (*hd.ExtendedKey, error) {
 	keyPath, err := km.datastore.GetPathForKey(scriptAddress)
 	if err != nil {
 		key, err := km.datastore.GetKey(scriptAddress)
 		if err != nil {
+			log.Debug(err)
 			return nil, err
 		}
 		hdKey := hd.NewExtendedKey(
 			km.params.HDPrivateKeyID[:],
-			key.Serialize(),
-			make([]byte, 32),
+			key.Serialize(), make([]byte, 32),
 			[]byte{0x00, 0x00, 0x00, 0x00},
-			0,
-			0,
-			true)
+			0, 0, true)
 		return hdKey, nil
 	}
 	return km.generateChildKey(keyPath.Purpose, uint32(keyPath.Index))
 }
 
-// Mark the given key as used and extend the lookahead window
 func (km *KeyManager) MarkKeyAsUsed(scriptAddress []byte) error {
 	if err := km.datastore.MarkKeyAsUsed(scriptAddress); err != nil {
 		return err

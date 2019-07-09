@@ -233,7 +233,7 @@ func EstimateSerializeSize(inputCount int, txOuts []*wire.TxOut, addChangeOutput
 	}
 
 	// 10 additional bytes are for version, locktime, and segwit flags
-	return 10 + wire.VarIntSerializeSize(uint64(inputCount)) +
+	return wire.VarIntSerializeSize(uint64(inputCount)) +
 		wire.VarIntSerializeSize(uint64(outputCount)) +
 		inputCount*redeemScriptSize +
 		SumOutputSerializeSizes(txOuts) +

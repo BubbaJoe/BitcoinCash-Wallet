@@ -369,7 +369,7 @@ func (ws *WireService) handleHeadersMsg(hmsg *headersMsg) {
 		if blockHeader.Timestamp.Before(ws.walletCreationDate.Add(-time.Hour * 24 * 7)) {
 			_, _, height, err := ws.chain.CommitHeader(*blockHeader)
 			if err != nil {
-				badHeaders++
+				ws.chain.RollbackToHeight(height - 1)
 				log.Errorf("Commit header error: %s", err.Error())
 			}
 
@@ -666,7 +666,7 @@ func (ws *WireService) handleInvMsg(imsg *invMsg) {
 		} else {
 			state.requestQueue = []*wire.InvVect{}
 		}
-		log.Debugf("Requesting block %s, len request queue: %d", iv.Hash.String(), len(state.requestQueue))
+		log.Debugf("Requesting block - %s, len request queue: %d", iv.Hash.String(), len(state.requestQueue))
 		state.requestedBlocks[iv.Hash] = struct{}{}
 	}
 	if len(gdmsg.InvList) > 0 {

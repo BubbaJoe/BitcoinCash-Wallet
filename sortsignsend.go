@@ -43,7 +43,7 @@ func (s *SPVWallet) Broadcast(tx *wire.MsgTx) error {
 	}
 
 	s.wireService.MsgChan() <- updateFiltersMsg{}
-	log.Debugf("Broadcasting tx %s to peers", tx.TxHash().String())
+	log.Noticef("Broadcasting tx %s to peers", tx.TxHash().String())
 	for _, peer := range s.peerManager.ConnectedPeers() {
 		peer.QueueMessage(tx, nil)
 	}
@@ -92,10 +92,12 @@ func (w *SPVWallet) gatherCoins() map[coinset.Coin]*hd.ExtendedKey {
 		c := NewCoin(u.Op.Hash.CloneBytes(), u.Op.Index, bch.Amount(u.Value), int64(confirmations), u.ScriptPubkey)
 		addr, err := w.ScriptToAddress(u.ScriptPubkey)
 		if err != nil {
+			log.Error(err)
 			continue
 		}
 		key, err := w.keyManager.GetKeyForScript(addr.ScriptAddress())
 		if err != nil {
+			log.Error(err)
 			continue
 		}
 		m[c] = key
@@ -615,11 +617,13 @@ func (w *SPVWallet) buildTx(amount int64, addr bch.Address, feeLevel wallet.FeeL
 	coins := make([]coinset.Coin, 0, len(coinMap))
 	for k := range coinMap {
 		coins = append(coins, k)
+		log.Debug(k.Value(), k.NumConfs(), k.Hash().String())
 	}
 	inputSource := func(target bch.Amount) (total bch.Amount, inputs []*wire.TxIn, amounts []bch.Amount, scripts [][]byte, err error) {
 		coinSelector := coinset.MaxValueAgeCoinSelector{MaxInputs: 10000, MinChangeAmount: bch.Amount(0)}
 		coins, err := coinSelector.CoinSelect(target, coins)
 		if err != nil {
+			log.Error("insuffient funds: target > ", target)
 			return total, inputs, []bch.Amount{}, scripts, errors.New("insuffient funds")
 		}
 		additionalPrevScripts = make(map[wire.OutPoint][]byte)

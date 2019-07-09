@@ -2,12 +2,18 @@ package bitcoincash
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"math/rand"
+	"os"
+	"os/signal"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/BubbaJoe/spvwallet-cash/exchangerates"
 	"github.com/BubbaJoe/spvwallet-cash/wallet-interface"
+	db "github.com/bubbajoe/spvwallet-cash/db"
 	"github.com/gcash/bchd/bchec"
 	"github.com/gcash/bchd/chaincfg"
 	"github.com/gcash/bchd/chaincfg/chainhash"
@@ -54,7 +60,7 @@ type SPVWallet struct {
 
 var log = logging.MustGetLogger("bitcoin")
 
-const WALLET_VERSION = "0.1.0"
+const WALLET_VERSION = "0.4.0"
 
 func NewSPVWallet(config *Config) (*SPVWallet, error) {
 	log.SetBackend(logging.AddModuleLevel(config.Logger))
@@ -81,6 +87,12 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	err = saveConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
 	w := &SPVWallet{
 		repoPath:         config.RepoPath,
 		masterPrivateKey: mPrivKey,
@@ -88,17 +100,11 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 		mnemonic:         config.Mnemonic,
 		params:           config.Params,
 		creationDate:     config.CreationDate,
-		feeProvider: NewFeeProvider(
-			config.MaxFee,
-			config.HighFee,
-			config.MediumFee,
-			config.LowFee,
-			nil,
-		),
-		fPositives:    make(chan *peer.Peer),
-		stopChan:      make(chan int),
-		fpAccumulator: make(map[int32]int32),
-		mutex:         new(sync.RWMutex),
+		feeProvider:      NewFeeProvider(3, 2, 1, 1, nil),
+		fPositives:       make(chan *peer.Peer),
+		stopChan:         make(chan int),
+		fpAccumulator:    make(map[int32]int32),
+		mutex:            new(sync.RWMutex),
 	}
 
 	er := exchangerates.NewBitcoinCashPriceFetcher(config.Proxy)
@@ -166,7 +172,33 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 	return w, nil
 }
 
+func saveConfig(config *Config) error {
+	ds, err := db.Create(config.RepoPath)
+	if err != nil {
+		return err
+	}
+	mnem, err := ds.GetMnemonic()
+	if err != nil {
+		ds.SetConfigKV("archived_mnemonic_"+strconv.Itoa(rand.Int()), mnem)
+	}
+	err = ds.SetMnemonic(config.Mnemonic)
+	if err != nil {
+		return err
+	}
+	ds.SetCreationDate(config.CreationDate)
+	return nil
+}
+
 func (w *SPVWallet) Start() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for range c {
+			fmt.Println("\n\n\nspvwallet-cash shutting down...")
+			w.Close()
+			os.Exit(1)
+		}
+	}()
 	w.running = true
 	go w.wireService.Start()
 	go w.peerManager.Start()
@@ -181,9 +213,8 @@ func (w *SPVWallet) Start() {
 func (w *SPVWallet) CurrencyCode() string {
 	if w.params.Name == chaincfg.MainNetParams.Name {
 		return "bch"
-	} else {
-		return "tbch"
 	}
+	return "tbch"
 }
 
 func (w *SPVWallet) CreationDate() time.Time {
@@ -211,13 +242,9 @@ func (w *SPVWallet) ChildKey(keyBytes []byte, chaincode []byte, isPrivateKey boo
 		id = w.params.HDPublicKeyID[:]
 	}
 	hdKey := hd.NewExtendedKey(
-		id,
-		keyBytes,
-		chaincode,
-		parentFP,
-		0,
-		0,
-		isPrivateKey)
+		id, keyBytes, chaincode, parentFP,
+		0, 0, isPrivateKey)
+
 	return hdKey.Child(0)
 }
 
@@ -247,11 +274,12 @@ func (w *SPVWallet) NewAddress(purpose wallet.KeyPurpose) bchutil.Address {
 }
 
 func (w *SPVWallet) DecodeAddress(addr string) (bchutil.Address, error) {
-	// Legacy
+	// Legacy and Cash Address
 	decoded, err := bchutil.DecodeAddress(addr, w.params)
 	if err == nil {
 		return decoded, nil
 	}
+
 	return nil, errors.New("Unrecognized address format")
 }
 
@@ -529,6 +557,15 @@ func (w *SPVWallet) Close() {
 
 func (w *SPVWallet) ReSyncBlockchain(fromDate time.Time) {
 	w.blockchain.Rollback(fromDate)
+	w.txstore.PopulateAdrs()
+	w.wireService.Resync()
+}
+
+func (w *SPVWallet) ResyncBlockchainHeight(height int32) {
+	if height < 0 {
+		height += int32(w.blockchain.checkpoint.Height)
+	}
+	w.blockchain.RollbackToHeight(uint32(height))
 	w.txstore.PopulateAdrs()
 	w.wireService.Resync()
 }
